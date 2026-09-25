@@ -1,0 +1,27 @@
+services:
+  laserlog:
+    build: .
+    image: laserlog:latest
+    container_name: laserlog
+    restart: unless-stopped
+    ports:
+      - "8420:8080"
+    volumes:
+      # On Unraid this is /mnt/user/appdata/laserlog
+      - ./data:/data
+      # Your existing laser files, mounted READ-ONLY. The :ro is what
+      # guarantees LaserLog can never modify, move or delete them.
+      # Point the left side at your Nextcloud user's files directory, e.g.
+      #   /mnt/user/appdata/nextcloud/data/chris/files
+      #   /mnt/user/nextcloud/chris/files
+      # then in the app: Files → Sources → folder = /nextcloud
+      - /mnt/user/nextcloud/chris/files:/nextcloud:ro
+    environment:
+      # Unraid defaults — nobody:users
+      PUID: "99"
+      PGID: "100"
+      TZ: "America/Indianapolis"
+      # AUTH=on  → username + password, created on first visit
+      # AUTH=off → wide open; only if it's LAN-only behind something else
+      AUTH: "on"
+      MAX_UPLOAD_MB: "15"

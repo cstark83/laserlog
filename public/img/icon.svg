@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="LaserLog">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#a78bfa"/>
+      <stop offset="1" stop-color="#5b21b6"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="9"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="120" fill="url(#g)"/>
+
+  <g fill="#fff" opacity=".55" filter="url(#glow)">
+    <path d="M225 180h62l10 178h-82z"/>
+    <ellipse cx="256" cy="358" rx="59" ry="25"/>
+    <rect x="160" y="352" width="24" height="12" rx="6"/>
+    <rect x="328" y="352" width="24" height="12" rx="6"/>
+  </g>
+
+  <g fill="#fff">
+    <rect x="141" y="77" width="230" height="64" rx="28"/>
+    <path d="M218 141h76l-23 38h-30z"/>
+    <path d="M241 176h30l6 182h-42z"/>
+    <rect x="79" y="358" width="354" height="30" rx="15"/>
+  </g>
+
+  <rect x="243" y="356" width="26" height="19" rx="7" fill="#6d28d9"/>
+</svg>

@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<!--
+  Unraid Docker template for LaserLog.
+
+  Replace YOUR_GITHUB_USERNAME below with your GitHub username (lowercase),
+  then drop this file in /boot/config/plugins/dockerMan/templates-user/ on the
+  Unraid flash drive. Docker tab -> Add Container -> pick LaserLog from the
+  template dropdown.
+
+  For a private package, run this on the server once first, so Unraid can pull
+  and can see when a new image is published:
+
+    docker login ghcr.io -u YOUR_GITHUB_USERNAME
+
+  and paste a GitHub personal access token with read:packages as the password.
+-->
+<Container version="2">
+  <Name>LaserLog</Name>
+  <Repository>ghcr.io/YOUR_GITHUB_USERNAME/laserlog:latest</Repository>
+  <Registry>https://ghcr.io/YOUR_GITHUB_USERNAME/laserlog</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/YOUR_GITHUB_USERNAME/laserlog/issues</Support>
+  <Project>https://github.com/YOUR_GITHUB_USERNAME/laserlog</Project>
+  <Overview>
+    Self-hosted laser cutter and engraver settings library. Track machines,
+    materials, proven speed/power/pass settings, material test grids and
+    projects. Installs on Android and iPhone as a progressive web app, works
+    offline, and syncs back to this container.
+  </Overview>
+  <Category>Productivity: HomeAutomation:</Category>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <TemplateURL/>
+  <Icon>https://raw.githubusercontent.com/YOUR_GITHUB_USERNAME/laserlog/main/public/img/icon-512.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+
+  <Config Name="WebUI Port" Target="8080" Default="8420" Mode="tcp"
+          Description="Port the web interface listens on."
+          Type="Port" Display="always" Required="true" Mask="false">8420</Config>
+
+  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/laserlog"
+          Mode="rw" Description="Database and uploaded photos live here."
+          Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/laserlog</Config>
+
+  <Config Name="Laser files (read-only)" Target="/nextcloud" Default="/mnt/disks/Plex_Data/nextcloud_data/Laser/files"
+          Mode="ro" Description="Your existing laser files — point this at your Nextcloud user's files folder (e.g. /mnt/user/appdata/nextcloud/data/chris/files). Mounted read-only: LaserLog catalogues what's there and never changes it. Leave blank if you don't want file indexing."
+          Type="Path" Display="always" Required="false" Mask="false">/mnt/disks/Plex_Data/nextcloud_data/Laser/files</Config>
+
+  <Config Name="Authentication" Target="AUTH" Default="on"
+          Description="on = username and password (set on first visit). off = no login at all; only sensible on a trusted LAN."
+          Type="Variable" Display="always" Required="true" Mask="false">on</Config>
+
+  <Config Name="PUID" Target="PUID" Default="99"
+          Description="User ID that owns the data folder. Unraid default is 99 (nobody)."
+          Type="Variable" Display="advanced" Required="false" Mask="false">99</Config>
+
+  <Config Name="PGID" Target="PGID" Default="100"
+          Description="Group ID that owns the data folder. Unraid default is 100 (users)."
+          Type="Variable" Display="advanced" Required="false" Mask="false">100</Config>
+
+  <Config Name="Max upload MB" Target="MAX_UPLOAD_MB" Default="15"
+          Description="Largest photo accepted per upload. Photos are shrunk on the phone before sending."
+          Type="Variable" Display="advanced" Required="false" Mask="false">15</Config>
+
+  <Config Name="Timezone" Target="TZ" Default="America/Indiana/Indianapolis"
+          Description="Container timezone."
+          Type="Variable" Display="advanced" Required="false" Mask="false">America/Indiana/Indianapolis</Config>
+</Container>

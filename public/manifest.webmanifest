@@ -1,0 +1,21 @@
+{
+  "name": "LaserLog — settings library",
+  "short_name": "LaserLog",
+  "description": "Track laser cutter and engraver settings that actually worked.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b0d12",
+  "theme_color": "#0b0d12",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    { "src": "/img/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/img/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "New setting", "url": "/#/library", "description": "Log settings from the last test" },
+    { "name": "Test grids", "url": "/#/tests", "description": "Record a material test matrix" }
+  ]
+}
