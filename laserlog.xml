@@ -2,7 +2,7 @@
 <!--
   Unraid Docker template for LaserLog.
 
-  Replace YOUR_GITHUB_USERNAME below with your GitHub username (lowercase),
+  Replace cstark83 below with your GitHub username (lowercase),
   then drop this file in /boot/config/plugins/dockerMan/templates-user/ on the
   Unraid flash drive. Docker tab -> Add Container -> pick LaserLog from the
   template dropdown.
@@ -10,20 +10,20 @@
   For a private package, run this on the server once first, so Unraid can pull
   and can see when a new image is published:
 
-    docker login ghcr.io -u YOUR_GITHUB_USERNAME
+    docker login ghcr.io -u cstark83
 
   and paste a GitHub personal access token with read:packages as the password.
 -->
 <Container version="2">
   <Name>LaserLog</Name>
-  <Repository>ghcr.io/YOUR_GITHUB_USERNAME/laserlog:latest</Repository>
-  <Registry>https://ghcr.io/YOUR_GITHUB_USERNAME/laserlog</Registry>
+  <Repository>ghcr.io/cstark83/laserlog:latest</Repository>
+  <Registry>https://ghcr.io/cstark83/laserlog</Registry>
   <Network>bridge</Network>
   <MyIP/>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
-  <Support>https://github.com/YOUR_GITHUB_USERNAME/laserlog/issues</Support>
-  <Project>https://github.com/YOUR_GITHUB_USERNAME/laserlog</Project>
+  <Support>https://github.com/cstark83/laserlog/issues</Support>
+  <Project>https://github.com/cstark83/laserlog</Project>
   <Overview>
     Self-hosted laser cutter and engraver settings library. Track machines,
     materials, proven speed/power/pass settings, material test grids and
@@ -33,7 +33,7 @@
   <Category>Productivity: HomeAutomation:</Category>
   <WebUI>http://[IP]:[PORT:8080]/</WebUI>
   <TemplateURL/>
-  <Icon>https://raw.githubusercontent.com/YOUR_GITHUB_USERNAME/laserlog/main/public/img/icon-512.png</Icon>
+  <Icon>https://raw.githubusercontent.com/cstark83/laserlog/main/public/img/icon-512.png</Icon>
   <ExtraParams/>
   <PostArgs/>
   <CPUset/>
