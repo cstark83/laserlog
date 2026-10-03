@@ -5,6 +5,8 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { db, UPLOAD_DIR, DATA_DIR, getMeta, setMeta, upsert, newId, nowISO } from './db.js';
 import {
@@ -18,7 +20,7 @@ import { startBackupSchedule } from './backup.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, '..', 'public');
 const PORT = Number(process.env.PORT || 8080);
-const APP_VERSION = '1.2.0';
+const APP_VERSION = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8')).version;
 
 const app = express();
 app.disable('x-powered-by');
@@ -223,9 +225,16 @@ app.use(
 /* ----------------------------- static ----------------------------- */
 
 // The service worker must never be cached, or phones get stuck on an old build.
-app.get('/sw.js', (_req, res) => {
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.sendFile(join(PUBLIC_DIR, 'sw.js'));
+app.get('/sw.js', async (_req, res) => {
+  try {
+    const src = await readFile(join(PUBLIC_DIR, 'sw.js'), 'utf8');
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.send(src.replace(/const VERSION = '[^']*';/, `const VERSION = 'v${APP_VERSION}';`));
+  } catch (e) {
+    res.status(500).type('text/plain').send('// service worker unavailable');
+    console.error('[laserlog] could not serve sw.js:', e.message);
+  }
 });
 
 app.use(express.static(PUBLIC_DIR, { maxAge: '1h', index: 'index.html' }));
