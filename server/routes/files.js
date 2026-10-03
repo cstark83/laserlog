@@ -422,10 +422,15 @@ filesRouter.post('/:id/import-settings', (req, res) => {
 
 /** Entries that came from, or were linked to, this file. */
 filesRouter.get('/:id/entries', (req, res) => {
-  res.json(db.prepare(
-    `SELECT e.* FROM entries e JOIN file_entries fe ON fe.entry_id = e.id
+  const rows = db.prepare(
+    `SELECT e.*, mc.name AS machine_name, mt.name AS material_name
+       FROM entries e
+       JOIN file_entries fe ON fe.entry_id = e.id
+       LEFT JOIN machines  mc ON mc.id = e.machine_id
+       LEFT JOIN materials mt ON mt.id = e.material_id
       WHERE fe.file_id = ? AND e.deleted_at IS NULL ORDER BY e.updated_at DESC`
-  ).all(req.params.id));
+  ).all(req.params.id);
+  res.json(rows);
 });
 
 filesRouter.post('/:id/link-entry', (req, res) => {
@@ -433,5 +438,11 @@ filesRouter.post('/:id/link-entry', (req, res) => {
   if (!entry_id) return res.status(400).json({ error: 'entry_id_required' });
   db.prepare(`INSERT OR IGNORE INTO file_entries (file_id, entry_id) VALUES (?,?)`)
     .run(req.params.id, entry_id);
+  res.json({ ok: true });
+});
+
+filesRouter.delete('/:id/link-entry/:entryId', (req, res) => {
+  db.prepare(`DELETE FROM file_entries WHERE file_id=? AND entry_id=?`)
+    .run(req.params.id, req.params.entryId);
   res.json({ ok: true });
 });

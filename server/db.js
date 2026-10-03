@@ -295,7 +295,7 @@ db.exec(SCHEMA);
 /* Migrations — additive only, safe to re-run                          */
 /* ------------------------------------------------------------------ */
 
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 
 function addColumnIfMissing(table, column, ddl) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
@@ -545,6 +545,54 @@ function migrate() {
     `);
   }
 
+  if (current < 8) {
+    // v8 — the settings entry form grows to match a dedicated laser logbook:
+    // resolution/spacing, a proper air-assist level, hatch type, a cleanup
+    // pass, and a couple of per-entry overrides (metal type, colour/coating,
+    // thickness) so a run doesn't have to point at a fully-specified material
+    // just to record what it actually was.
+
+    addColumnIfMissing('entries', 'metal_type', 'TEXT');
+    addColumnIfMissing('entries', 'color_coating', 'TEXT');
+    addColumnIfMissing('entries', 'thickness_mm', 'REAL');
+
+    // Resolution / spacing.
+    addColumnIfMissing('entries', 'lpi', 'REAL');
+    addColumnIfMissing('entries', 'overscan_pct', 'REAL');
+    addColumnIfMissing('entries', 'image_mode', 'TEXT');
+    addColumnIfMissing('entries', 'negative_image', 'INTEGER NOT NULL DEFAULT 0');
+    addColumnIfMissing('entries', 'pass_through', 'INTEGER NOT NULL DEFAULT 0');
+    addColumnIfMissing('entries', 'dot_width_correction_mm', 'REAL');
+
+    // Fiber-specific.
+    addColumnIfMissing('entries', 'q_pulse', 'TEXT');
+
+    // Air assist grows from on/off to a level. The old `air_assist` column
+    // stays and is kept in sync (see upsert()) so exports and filters that
+    // still read it keep working.
+    addColumnIfMissing('entries', 'air_assist_level', 'TEXT');
+    db.exec(`UPDATE entries SET air_assist_level = CASE WHEN air_assist = 1 THEN 'high' ELSE 'off' END
+              WHERE air_assist_level IS NULL`);
+
+    // Hatch settings.
+    addColumnIfMissing('entries', 'hatch_type', 'TEXT');
+    db.exec(`UPDATE entries SET hatch_type = 'cross' WHERE hatch_type IS NULL AND hatch_cross = 1`);
+    addColumnIfMissing('entries', 'hatch_angle_increment_deg', 'REAL');
+    addColumnIfMissing('entries', 'ramp_length_mm', 'REAL');
+
+    // Cleanup pass: a second, lighter pass run after the main one to clear
+    // haze or char without re-cutting the whole job at full power.
+    addColumnIfMissing('entries', 'cleanup_enabled', 'INTEGER NOT NULL DEFAULT 0');
+    addColumnIfMissing('entries', 'cleanup_power', 'REAL');
+    addColumnIfMissing('entries', 'cleanup_speed', 'REAL');
+    addColumnIfMissing('entries', 'cleanup_passes', 'INTEGER');
+    addColumnIfMissing('entries', 'cleanup_interval_mm', 'REAL');
+
+    // Metal type on the material itself, as a proper alloy dropdown — `grade`
+    // already existed as free text and is left alone.
+    addColumnIfMissing('materials', 'metal_type', 'TEXT');
+  }
+
   db.prepare(
     `INSERT INTO meta (key, value) VALUES ('schema_version', ?)
      ON CONFLICT(key) DO UPDATE SET value=excluded.value`
@@ -624,6 +672,18 @@ export function upsert(table, fields, payload, id = null) {
     const unit = Object.prototype.hasOwnProperty.call(data, 'speed_unit')
       ? data.speed_unit : (prior?.speed_unit ?? 'mm/min');
     data.speed_mm_min = toMmPerMin(speed, unit);
+  }
+
+  // The air-assist level is what the form writes now; the plain on/off column
+  // is kept alongside it so the CSV import, CSV export and LightBurn export —
+  // none of which know about levels — still see the right thing.
+  if (table === 'entries' && Object.prototype.hasOwnProperty.call(data, 'air_assist_level')) {
+    data.air_assist = data.air_assist_level && data.air_assist_level !== 'off' ? 1 : 0;
+  }
+
+  // Same idea for hatch type vs. the old cross-hatch boolean.
+  if (table === 'entries' && Object.prototype.hasOwnProperty.call(data, 'hatch_type')) {
+    data.hatch_cross = data.hatch_type === 'cross' ? 1 : 0;
   }
 
   if (existing) {

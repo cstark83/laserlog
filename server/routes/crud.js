@@ -79,7 +79,7 @@ export const MACHINE_FIELDS = [
 export const MATERIAL_FIELDS = [
   'name', 'category', 'thickness_mm', 'color', 'brand', 'supplier', 'url',
   'cost', 'cost_unit', 'sheet_w_mm', 'sheet_h_mm', 'notes', 'archived',
-  'grade', 'reflective', 'coated', 'hazard', 'hazard_note',
+  'grade', 'reflective', 'coated', 'hazard', 'hazard_note', 'metal_type',
 ];
 
 export const ENTRY_FIELDS = [
@@ -97,6 +97,20 @@ export const ENTRY_FIELDS = [
   'dross', 'taper_note', 'edge_quality',
   // what makes a fiber setting non-transferable
   'rotary', 'rotary_diameter_mm',
+  // machine + material, per-run overrides
+  'metal_type', 'color_coating', 'thickness_mm',
+  // resolution / spacing
+  'lpi', 'overscan_pct', 'image_mode', 'negative_image', 'pass_through',
+  'dot_width_correction_mm',
+  // fiber-specific
+  'q_pulse',
+  // air assist level ('off' | 'low' | 'high')
+  'air_assist_level',
+  // hatch settings
+  'hatch_type', 'hatch_angle_increment_deg', 'ramp_length_mm',
+  // cleanup pass
+  'cleanup_enabled', 'cleanup_power', 'cleanup_speed', 'cleanup_passes',
+  'cleanup_interval_mm',
 ];
 
 export const MAINTENANCE_FIELDS = [

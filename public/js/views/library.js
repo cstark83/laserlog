@@ -6,12 +6,11 @@ import {
   HAZARDS, hazardBadge, hazardBanner,
 } from '../ui.js';
 import { photoStrip } from './photos.js';
-import { MACHINE_PRESETS, MACHINE_ROLES, SOURCE_TYPES } from '../presets.js';
+import { MACHINE_PRESETS, MACHINE_ROLES, SOURCE_TYPES, MATERIAL_CATEGORIES, METAL_TYPES } from '../presets.js';
 
 /* ------------------------------------------------------------ materials */
 
-const CATEGORIES = ['Plywood', 'Hardwood', 'MDF', 'Acrylic', 'Leather', 'Paper',
-  'Fabric', 'Metal', 'Stone', 'Glass', 'Rubber', 'Foam', 'Other'];
+const CATEGORIES = MATERIAL_CATEGORIES;
 
 let showArchivedMaterials = false;
 
@@ -96,20 +95,21 @@ export function openMaterialEditor(material, ctx, onSaved) {
     ${field({ label: 'Name', name: 'name', value: m.name,
               placeholder: 'Baltic birch plywood' })}
     <div class="field-row">
-      ${selectField({ label: 'Category', name: 'category', value: m.category,
+      ${selectField({ label: 'Material', name: 'category', value: m.category,
         options: CATEGORIES, blank: 'Uncategorised' })}
       ${field({ label: 'Thickness mm', name: 'thickness_mm', value: m.thickness_mm,
         type: 'number', step: 'any' })}
     </div>
-    <div class="field-row">
-      ${field({ label: 'Colour / finish', name: 'color', value: m.color, placeholder: 'Natural' })}
-      ${field({ label: 'Grade / alloy', name: 'grade', value: m.grade,
-        placeholder: '304, 316, 6061, 260 brass' })}
+    <div id="metal-type-wrap" style="display:${m.category === 'Metal' ? '' : 'none'}">
+      ${selectField({ label: 'Metal type', name: 'metal_type', value: m.metal_type,
+        options: METAL_TYPES, blank: 'Not specified' })}
     </div>
+    ${field({ label: 'Colour / coating', name: 'color', value: m.color,
+      placeholder: 'Natural, black anodised, gloss film…' })}
     <div class="field-row">
       ${field({ label: 'Brand', name: 'brand', value: m.brand })}
-      ${field({ label: 'Coating / film', name: 'coated', value: m.coated,
-        placeholder: 'PVC film, anodised, powder-coated' })}
+      ${field({ label: 'Grade / alloy', name: 'grade', value: m.grade,
+        placeholder: '304, 316, 6061, 260 brass' })}
     </div>
     ${switchField({ label: 'Reflective metal (copper, brass, bare alu)', name: 'reflective',
       checked: m.reflective })}
@@ -140,6 +140,11 @@ export function openMaterialEditor(material, ctx, onSaved) {
     ${textareaField({ label: 'Why', name: 'hazard_note', value: m.hazard_note, rows: 2,
       placeholder: 'What it gives off, what it does to the machine, what to do instead.' })}
     ${!isNew ? '<div id="photos"></div>' : ''}`;
+
+  // Metal type only makes sense once the category says this is a metal.
+  $('[name=category]', body).addEventListener('change', (e) => {
+    $('#metal-type-wrap', body).style.display = e.target.value === 'Metal' ? '' : 'none';
+  });
 
   // Keep the banner honest while the flag is being changed.
   const hazSel = $('[name=hazard]', body);

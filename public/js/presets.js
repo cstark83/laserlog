@@ -97,6 +97,50 @@ export const DROSS = [
   { value: 'heavy', label: 'Heavy — needs grinding' },
 ];
 
+export const AIR_ASSIST_LEVELS = [
+  { value: 'off', label: 'Not used' },
+  { value: 'low', label: 'Low' },
+  { value: 'high', label: 'High' },
+];
+
+export const IMAGE_MODES = [
+  { value: 'threshold', label: 'Threshold' },
+  { value: 'ordered', label: 'Ordered' },
+  { value: 'atkinson', label: 'Atkinson' },
+  { value: 'stucki', label: 'Stucki' },
+  { value: 'jarvis', label: 'Jarvis' },
+  { value: 'grayscale', label: 'Grayscale' },
+  { value: '3d_slice', label: '3D Slice' },
+  { value: 'sketch', label: 'Sketch' },
+  { value: 'newsprint', label: 'Newsprint' },
+  { value: 'dither', label: 'Dither' },
+];
+
+export const HATCH_TYPES = [
+  { value: 'line', label: 'Line' },
+  { value: 'cross', label: 'Cross' },
+  { value: 'offset', label: 'Offset fill' },
+  { value: 'honeycomb', label: 'Honeycomb' },
+  { value: 'concentric', label: 'Concentric' },
+];
+
+export const METAL_TYPES = [
+  { value: 'Stainless 304', label: 'Stainless 304' },
+  { value: 'Stainless 316', label: 'Stainless 316' },
+  { value: 'Aluminum', label: 'Aluminum' },
+  { value: 'Anodized Aluminum', label: 'Anodized Aluminum' },
+  { value: 'Brass', label: 'Brass' },
+  { value: 'Copper', label: 'Copper' },
+  { value: 'Titanium', label: 'Titanium' },
+  { value: 'Steel', label: 'Steel' },
+  { value: 'Other', label: 'Other' },
+];
+
+export const MATERIAL_CATEGORIES = [
+  'Wood', 'Plywood', 'MDF', 'Acrylic', 'Leather', 'Metal', 'Stone', 'Glass',
+  'Paper', 'Fabric', 'Rubber', 'Hardwood', 'Foam', 'Other',
+];
+
 /* ------------------------------------------------------------- units */
 
 const TO_MM_MIN = { 'mm/min': 1, 'mm/s': 60, 'in/min': 25.4, 'in/s': 25.4 * 60 };

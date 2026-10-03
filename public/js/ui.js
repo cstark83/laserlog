@@ -338,10 +338,13 @@ export function bindRating(root) {
 
 export const OPERATIONS = [
   { value: 'cut', label: 'Cut' },
-  { value: 'engrave', label: 'Engrave' },
+  { value: 'engrave', label: 'Line Engrave' },
+  { value: 'fill', label: 'Fill / Raster Engrave' },
   { value: 'score', label: 'Score' },
-  { value: 'photo', label: 'Photo engrave' },
-  { value: 'fill', label: 'Fill / raster' },
+  { value: 'photo', label: 'Photo Engrave' },
+  { value: 'color_mark', label: 'Color Mark' },
+  { value: 'deep_engrave', label: 'Deep Engrave' },
+  { value: 'depth_map', label: '3D / Depth Map' },
 ];
 
 export const OUTCOMES = [

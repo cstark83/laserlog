@@ -57,6 +57,25 @@ const entryPhotos = (entryId) =>
       ORDER BY created_at`
   ).all(entryId);
 
+const entryFiles = (entryId) =>
+  db.prepare(
+    `SELECT f.id, f.name, f.rel_path, f.ext, f.kind, f.thumb, f.category
+       FROM files f JOIN file_entries fe ON fe.file_id = f.id
+      WHERE fe.entry_id = ? AND f.deleted_at IS NULL
+      ORDER BY f.name COLLATE NOCASE`
+  ).all(entryId);
+
+/** Replace the full set of files linked to an entry — same shape as setEntryTags. */
+function setEntryFiles(entryId, fileIds) {
+  if (!Array.isArray(fileIds)) return;
+  db.prepare(`DELETE FROM file_entries WHERE entry_id=?`).run(entryId);
+  const link = db.prepare(`INSERT OR IGNORE INTO file_entries (file_id, entry_id) VALUES (?,?)`);
+  for (const fileId of fileIds) {
+    const id = String(fileId || '').trim();
+    if (id) link.run(id, entryId);
+  }
+}
+
 function setEntryTags(entryId, names) {
   if (!Array.isArray(names)) return;
   db.prepare(`DELETE FROM entry_tags WHERE entry_id=?`).run(entryId);
@@ -87,6 +106,7 @@ const hydrateEntry = (row) => {
     ...row,
     tags: entryTags(row.id),
     photos: entryPhotos(row.id),
+    files: entryFiles(row.id),
     machine_name: row.machine_id
       ? db.prepare(`SELECT name FROM machines WHERE id=?`).get(row.machine_id)?.name ?? null
       : null,
@@ -147,6 +167,7 @@ entriesRouter.post('/', (req, res) => {
   try {
     const row = upsert('entries', ENTRY_FIELDS, req.body || {});
     setEntryTags(row.id, req.body?.tags);
+    if (Array.isArray(req.body?.file_ids)) setEntryFiles(row.id, req.body.file_ids);
     res.status(201).json(hydrateEntry(get('entries', row.id)));
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -157,6 +178,7 @@ entriesRouter.put('/:id', (req, res) => {
   try {
     const row = upsert('entries', ENTRY_FIELDS, req.body || {}, req.params.id);
     setEntryTags(row.id, req.body?.tags);
+    if (Array.isArray(req.body?.file_ids)) setEntryFiles(row.id, req.body.file_ids);
     res.json(hydrateEntry(get('entries', row.id)));
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -169,6 +191,7 @@ entriesRouter.post('/:id/duplicate', (req, res) => {
   copy.title = (src.title || 'Untitled') + ' (copy)';
   const row = upsert('entries', ENTRY_FIELDS, copy);
   setEntryTags(row.id, entryTags(src.id));
+  setEntryFiles(row.id, entryFiles(src.id).map((f) => f.id));
   res.status(201).json(hydrateEntry(get('entries', row.id)));
 });
 
@@ -497,6 +520,7 @@ api.post('/sync', (req, res) => {
         }
         const row = upsert(table, fieldMap[table], payload, payload.id);
         if (table === 'entries' && Array.isArray(payload.tags)) setEntryTags(row.id, payload.tags);
+        if (table === 'entries' && Array.isArray(payload.file_ids)) setEntryFiles(row.id, payload.file_ids);
         results.push({ id: row.id, table, status: existing ? 'updated' : 'created' });
       } catch (e) {
         results.push({ id: payload?.id, table, status: 'error', error: e.message });

@@ -378,6 +378,20 @@ export async function scanSource(sourceId, { parseLightburn = true } = {}) {
     .all(sourceId);
   const byPath = new Map(existing.map((r) => [r.rel_path, r]));
   const seen = new Set();
+  const consumedIds = new Set();
+
+  // A file that moved or was renamed keeps its size and mtime — the
+  // filesystem doesn't touch either just because the name changed. Indexing
+  // the rows not otherwise matched by (size, mtime) lets a rescan recognise
+  // it as the same file instead of "gone" + "new", so category, tags,
+  // machine/material/project links and notes all survive the move.
+  const bySignature = new Map();
+  for (const row of existing) {
+    if (row.size == null || !row.mtime) continue;
+    const key = `${row.size}|${row.mtime}`;
+    if (!bySignature.has(key)) bySignature.set(key, []);
+    bySignature.get(key).push(row);
+  }
 
   // An unassigned device that is present but not mounted looks like an empty
   // folder, not an error. Flagging the whole catalogue missing because of that
@@ -393,27 +407,52 @@ export async function scanSource(sourceId, { parseLightburn = true } = {}) {
     throw err;
   }
 
-  const stats = { total: found.length, added: 0, updated: 0, missing: 0,
-                  excluded: 0, lightburn: 0 };
+  const stats = { total: found.length, added: 0, updated: 0, moved: 0,
+                  missing: 0, excluded: 0, lightburn: 0 };
 
   // Anything needing the file opened is collected now and done after the
   // transaction, so a slow disk doesn't hold a write lock on the database.
   const toParse = [];
 
   const applyAll = db.transaction(() => {
+    // Pass 1 — exact path matches, exactly as before. Consuming these first
+    // (regardless of the order `found` happens to be in) means a file that
+    // hasn't moved is never mistaken for the source of a move somewhere else.
+    const unmatched = [];
+    for (const f of found) {
+      const prev = byPath.get(f.rel_path);
+      if (prev) { consumedIds.add(prev.id); } else { unmatched.push(f); }
+    }
+
+    // Pass 2 — anything left is either genuinely new or moved/renamed. An
+    // ambiguous signature (more than one still-unconsumed row sharing the
+    // same size + mtime) is left alone rather than guessed at.
+    const movedFrom = new Map();  // found file -> the existing row it replaces
+    for (const f of unmatched) {
+      if (f.size == null || !f.mtime) continue;
+      const candidates = (bySignature.get(`${f.size}|${f.mtime}`) || [])
+        .filter((r) => !consumedIds.has(r.id));
+      if (candidates.length === 1) {
+        movedFrom.set(f, candidates[0]);
+        consumedIds.add(candidates[0].id);
+      }
+    }
+
     for (const f of found) {
       seen.add(f.rel_path);
-      const prev = byPath.get(f.rel_path);
+      const prev = byPath.get(f.rel_path) || movedFrom.get(f);
       const kind = classify(f.ext);
 
       if (prev) {
-        const changed = prev.mtime !== f.mtime || prev.size !== f.size;
+        const moved = prev.rel_path !== f.rel_path;
+        const changed = moved || prev.mtime !== f.mtime || prev.size !== f.size;
         db.prepare(
           `UPDATE files SET name=?, ext=?, kind=?, size=?, mtime=?, folder=?,
-                            missing=0, updated_at=?
+                            rel_path=?, missing=0, updated_at=?
             WHERE id=?`
-        ).run(f.name, f.ext, kind, f.size, f.mtime, f.folder, ts, prev.id);
-        if (changed) stats.updated++;
+        ).run(f.name, f.ext, kind, f.size, f.mtime, f.folder, f.rel_path, ts, prev.id);
+        if (moved) stats.moved++;
+        else if (changed) stats.updated++;
         if (kind === 'lightburn' && parseLightburn && (changed || !prev.meta_json)) {
           toParse.push({ id: prev.id, rel_path: f.rel_path });
         }
@@ -431,7 +470,7 @@ export async function scanSource(sourceId, { parseLightburn = true } = {}) {
     }
 
     for (const row of existing) {
-      if (seen.has(row.rel_path)) continue;
+      if (seen.has(row.rel_path) || consumedIds.has(row.id)) continue;
 
       // Newly excluded rather than gone. Drop it out of the catalogue, because
       // 20,000 rows flagged "missing" is not what excluding a folder means.
@@ -479,6 +518,7 @@ export async function scanSource(sourceId, { parseLightburn = true } = {}) {
   }
 
   const msg = `${stats.total} files · ${stats.added} new · ${stats.updated} changed`
+            + `${stats.moved ? ` · ${stats.moved} moved or renamed` : ''}`
             + `${stats.excluded ? ` · ${stats.excluded} dropped by exclusions` : ''}`
             + `${stats.missing ? ` · ${stats.missing} missing` : ''}`
             + `${stats.lightburn ? ` · ${stats.lightburn} with settings` : ''}`

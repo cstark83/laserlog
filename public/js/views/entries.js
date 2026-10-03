@@ -4,11 +4,20 @@ import {
   $, $$, el, esc, num, icons, stars, thickness, relTime, openSheet, closeSheet,
   confirmSheet, toast, readForm, field, selectField, textareaField, switchField,
   ratingField, bindRating, OPERATIONS, OUTCOMES, outcomeBadge, opLabel, empty,
-  hazardBadge, hazardBanner,
+  hazardBadge, hazardBanner, FILE_KINDS,
 } from '../ui.js';
 import { photoStrip } from './photos.js';
-import { fieldGroupsFor, LENSES } from '../presets.js';
+import {
+  fieldGroupsFor, LENSES, AIR_ASSIST_LEVELS, IMAGE_MODES, HATCH_TYPES,
+  METAL_TYPES, ASSIST_GASES,
+} from '../presets.js';
 import { startTimer, activeTimer } from '../timer.js';
+import { openFileDetail } from './files.js';
+
+/** Short label for the level a switch used to be. */
+const airAssistLabel = (level) =>
+  AIR_ASSIST_LEVELS.find((a) => a.value === level)?.label
+  || (level ? level : null);
 
 const filters = {
   q: '', machine_id: '', material_id: '', operation: '', favorite: false, min_rating: '',
@@ -47,7 +56,9 @@ export function entryCard(e) {
           <div class="entry__sub">
             ${e.operation ? `<span class="badge badge--op">${esc(opLabel(e.operation))}</span>` : ''}
             ${hazardBadge(e.material_hazard)}
-            ${e.air_assist ? '<span class="badge">air</span>' : ''}
+            ${e.air_assist_level && e.air_assist_level !== 'off' ? `<span class="badge">air: ${esc(airAssistLabel(e.air_assist_level))}</span>`
+              : (!e.air_assist_level && e.air_assist ? '<span class="badge">air</span>' : '')}
+            ${e.files?.length ? `<span class="badge">${icons.files} ${e.files.length}</span>` : ''}
             ${sub.map((s, i) => `<span style="display:inline-flex;align-items:center;gap:6px">${
               i ? '<span class="dot"></span>' : ''}${s}</span>`).join('')}
           </div>
@@ -346,31 +357,50 @@ export function openEntryDetail(entry, ctx, onChanged) {
     ['Material', entry.material_name
       ? entry.material_name + (entry.material_thickness ? ` · ${thickness(entry.material_thickness)}` : '')
       : null],
+    ['Metal type', entry.metal_type],
+    ['Colour / coating', entry.color_coating],
+    ['Thickness', entry.thickness_mm != null ? thickness(entry.thickness_mm) : null],
     ['Operation', entry.operation ? opLabel(entry.operation) : null],
     ['Speed', entry.speed != null ? `${num(entry.speed, 0)} ${entry.speed_unit || 'mm/min'}` : null],
     ['Power max', entry.power_max != null ? `${num(entry.power_max)}%` : null],
     ['Power min', entry.power_min != null ? `${num(entry.power_min)}%` : null],
     ['Passes', entry.passes],
-    ['Line interval', entry.line_interval_mm != null ? `${num(entry.line_interval_mm, 3)} mm` : null],
-    ['DPI', entry.dpi],
-    ['Air assist', entry.air_assist ? 'Yes' : 'No'],
     ['Focus offset', entry.focus_offset_mm != null ? `${num(entry.focus_offset_mm, 2)} mm` : null],
-    ['Z step', entry.z_step_mm != null ? `${num(entry.z_step_mm, 2)} mm` : null],
-    ['Pass depth', entry.pass_depth_mm != null ? `${num(entry.pass_depth_mm, 2)} mm` : null],
+    ['Line interval / spacing', entry.line_interval_mm != null ? `${num(entry.line_interval_mm, 3)} mm` : null],
+    ['DPI', entry.dpi],
+    ['LPI', entry.lpi],
+    ['Overscanning', entry.overscan_pct != null ? `${num(entry.overscan_pct)}%` : null],
+    ['Image mode', IMAGE_MODES.find((m) => m.value === entry.image_mode)?.label || entry.image_mode],
+    ['Negative image', entry.negative_image ? 'Yes' : null],
+    ['Pass-through', entry.pass_through ? 'Yes' : null],
+    ['Dot width correction', entry.dot_width_correction_mm != null ? `${num(entry.dot_width_correction_mm, 3)} mm` : null],
     ['Frequency', entry.frequency_khz != null ? `${num(entry.frequency_khz)} kHz` : null],
     ['Pulse width', entry.pulse_width_ns != null ? `${num(entry.pulse_width_ns)} ns` : null],
-    ['Kerf', entry.kerf_mm != null ? `${num(entry.kerf_mm, 3)} mm` : null],
+    ['Q-Pulse', entry.q_pulse],
     ['Lens', entry.lens_mm != null ? `${num(entry.lens_mm, 0)} mm` : null],
-    ['Rotary', entry.rotary
-      ? `Yes${entry.rotary_diameter_mm ? ` — ${num(entry.rotary_diameter_mm, 1)}mm dia` : ''}` : null],
-    ['Hatch angle', entry.hatch_angle_deg != null ? `${num(entry.hatch_angle_deg, 0)}°` : null],
-    ['Cross-hatch', entry.hatch_cross ? 'Yes' : null],
-    ['Bidirectional', entry.bidir ? 'Yes' : null],
     ['Wobble', entry.wobble_on
       ? [entry.wobble_amp_mm != null ? `${num(entry.wobble_amp_mm, 2)}mm` : null,
          entry.wobble_freq_hz != null ? `${num(entry.wobble_freq_hz, 0)}Hz` : null]
         .filter(Boolean).join(' @ ') || 'Yes'
       : null],
+    ['Air assist', airAssistLabel(entry.air_assist_level) || (entry.air_assist ? 'On' : null)],
+    ['Hatch type', HATCH_TYPES.find((h) => h.value === entry.hatch_type)?.label || entry.hatch_type],
+    ['Hatch angle', entry.hatch_angle_deg != null ? `${num(entry.hatch_angle_deg, 0)}°` : null],
+    ['Angle increment', entry.hatch_angle_increment_deg != null ? `${num(entry.hatch_angle_increment_deg, 0)}°` : null],
+    ['Kerf offset', entry.kerf_mm != null ? `${num(entry.kerf_mm, 3)} mm` : null],
+    ['Z step per pass', entry.z_step_mm != null ? `${num(entry.z_step_mm, 2)} mm` : null],
+    ['Ramp length', entry.ramp_length_mm != null ? `${num(entry.ramp_length_mm, 2)} mm` : null],
+    ['Cleanup pass', entry.cleanup_enabled
+      ? [entry.cleanup_power != null ? `${num(entry.cleanup_power)}%` : null,
+         entry.cleanup_speed != null ? `${num(entry.cleanup_speed)} ${entry.speed_unit || 'mm/min'}` : null,
+         entry.cleanup_passes != null ? `${entry.cleanup_passes}x` : null,
+         entry.cleanup_interval_mm != null ? `${num(entry.cleanup_interval_mm, 3)}mm` : null]
+        .filter(Boolean).join(' · ') || 'Enabled'
+      : null],
+    ['Pass depth', entry.pass_depth_mm != null ? `${num(entry.pass_depth_mm, 2)} mm` : null],
+    ['Rotary', entry.rotary
+      ? `Yes${entry.rotary_diameter_mm ? ` — ${num(entry.rotary_diameter_mm, 1)}mm dia` : ''}` : null],
+    ['Bidirectional', entry.bidir ? 'Yes' : null],
     ['Colour', entry.color_result],
     ['Edge', { none: 'Clean', light: 'Light char / dross', heavy: 'Heavy char / dross' }[entry.dross]],
     ['Edge quality', entry.edge_quality != null ? `${num(entry.edge_quality, 0)} / 5` : null],
@@ -390,10 +420,43 @@ export function openEntryDetail(entry, ctx, onChanged) {
         <span class="kv__v kv__v--mono">${esc(v)}</span></div>`).join('')}
     </div>
     ${entry.tags?.length ? `<div class="row row--wrap">${entry.tags.map((t) => `<span class="badge">#${esc(t)}</span>`).join('')}</div>` : ''}
+    ${entry.files?.length ? `
+      <div class="section-title">Design files</div>
+      <div class="filegrid" id="entry-files"></div>` : ''}
     ${entry.notes ? `<div class="card"><div class="field__label" style="margin-bottom:6px">Notes</div>
       <div style="white-space:pre-wrap">${esc(entry.notes)}</div></div>` : ''}
     <div id="photos"></div>
     <div class="small muted">Updated ${relTime(entry.updated_at)}</div>`;
+
+  if (entry.files?.length) {
+    const host = $('#entry-files', body);
+    host.innerHTML = entry.files.map((f) => {
+      const kind = FILE_KINDS[f.kind] || FILE_KINDS.other;
+      const hasThumb = f.thumb || f.kind === 'image' || f.ext === '.svg';
+      return `
+        <article class="filecard" data-dfile="${esc(f.id)}">
+          <div class="filecard__thumb ${f.ext === '.svg' ? 'filecard__thumb--art' : ''}">
+            ${hasThumb
+              ? `<img src="/api/files/${esc(f.id)}/thumb" loading="lazy" alt=""
+                      onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'filecard__icon',innerHTML:this.dataset.fb}))"
+                      data-fb="${esc(icons[kind.icon])}">`
+              : `<div class="filecard__icon">${icons[kind.icon]}</div>`}
+          </div>
+          <div class="filecard__meta">
+            <div class="filecard__name" title="${esc(f.rel_path || f.name)}">${esc(f.name)}</div>
+            ${f.category ? `<div class="filecard__sub"><span class="badge">${esc(f.category)}</span></div>` : ''}
+          </div>
+        </article>`;
+    }).join('');
+    host.onclick = async (e) => {
+      const card = e.target.closest('[data-dfile]');
+      if (!card) return;
+      try {
+        const full = await api.get(`/api/files/${card.dataset.dfile}`);
+        openFileDetail(full, ctx, onChanged);
+      } catch { toast('Could not open that file', 'bad'); }
+    };
+  }
 
   photoStrip($('#photos', body), 'entry', entry.id, entry.photos || []);
 
@@ -428,7 +491,7 @@ export function openEntryDetail(entry, ctx, onChanged) {
 
 /* --------------------------------------------------------------- editor */
 
-export function openEntryEditor(entry, ctx, onSaved) {
+export function openEntryEditor(entry, ctx, onSaved, presetFiles = []) {
   const e = entry || {};
   const isNew = !e.id;
   const machines = ctx.machines || [];
@@ -437,16 +500,21 @@ export function openEntryEditor(entry, ctx, onSaved) {
   const body = el(`<form class="stack" id="entry-form" autocomplete="off"></form>`);
 
   /**
-   * The form follows the machine. A galvo marker and a diode gantry share
-   * almost none of their parameters, and a form showing all of both is a form
-   * nobody fills in — so `fieldGroupsFor` decides what appears.
+   * The form follows the machine and the material. A galvo marker and a
+   * diode gantry share almost none of their parameters, and a form showing
+   * all of both is a form nobody fills in — so `fieldGroupsFor` decides what
+   * the legacy "advanced" block at the bottom shows, and the machine's kind
+   * decides whether the fiber-specific section appears at all.
    *
    * Values already typed are carried across a redraw, so switching machine
-   * halfway through does not wipe what you have entered.
+   * or material halfway through does not wipe what you have entered.
    */
   const draw = (v) => {
     const machine = machines.find((m) => m.id === v.machine_id) || null;
+    const material = materials.find((m) => m.id === v.material_id) || null;
     const g = fieldGroupsFor(machine);
+    const isFiber = machine?.kind === 'fiber' || machine?.kind === 'uv';
+    const isMetal = material?.category === 'Metal';
     const lensList = machine?.lens_mm
       ? String(machine.lens_mm).split(/[,;/]/).map((x) => Number(x.trim())).filter(Boolean)
       : LENSES;
@@ -455,10 +523,11 @@ export function openEntryEditor(entry, ctx, onSaved) {
     ${field({ label: 'Title', name: 'title', value: v.title,
               placeholder: 'e.g. 3mm ply — clean cut, no flashback' })}
 
+    <div class="section-title">Machine &amp; material</div>
     <div class="field-row">
       ${selectField({ label: 'Machine', name: 'machine_id', value: v.machine_id,
         options: machines.map((m) => ({ value: m.id, label: m.name })), blank: 'No machine' })}
-      ${selectField({ label: 'Operation', name: 'operation', value: v.operation || 'cut',
+      ${selectField({ label: 'Operation type', name: 'operation', value: v.operation || 'cut',
         options: OPERATIONS, blank: null })}
     </div>
 
@@ -469,42 +538,59 @@ export function openEntryEditor(entry, ctx, onSaved) {
           + m.name + (m.thickness_mm ? ` — ${thickness(m.thickness_mm)}` : '')
           + (m.color ? ` (${m.color})` : ''),
       })), blank: 'No material' })}
-    <div id="mat-hazard"></div>
-
-    <div class="section-title">The numbers</div>
+    ${hazardBanner(material)}
 
     <div class="field-row">
-      ${field({ label: 'Speed', name: 'speed', value: v.speed, type: 'number', step: 'any' })}
-      ${selectField({ label: 'Unit', name: 'speed_unit',
-        value: v.speed_unit || machine?.speed_unit || 'mm/min',
-        options: ['mm/min', 'mm/s', 'in/min', '%'], blank: null,
-        hint: machine?.speed_unit ? `${machine.name} reports ${machine.speed_unit}` : null })}
+      ${field({ label: 'Colour / coating', name: 'color_coating', value: v.color_coating,
+        placeholder: 'Natural, black anodised, gloss film…' })}
+      ${field({ label: 'Thickness mm', name: 'thickness_mm', value: v.thickness_mm,
+        type: 'number', step: 'any',
+        hint: material?.thickness_mm && v.thickness_mm == null
+          ? `Material default: ${thickness(material.thickness_mm)}` : null })}
     </div>
+    ${isMetal ? selectField({ label: 'Metal type', name: 'metal_type', value: v.metal_type,
+        options: METAL_TYPES, blank: 'Not specified' }) : ''}
 
+    <div class="section-title">Common settings</div>
     <div class="field-row">
-      ${field({ label: 'Power max %', name: 'power_max', value: v.power_max, type: 'number',
+      ${field({ label: 'Power %', name: 'power_max', value: v.power_max, type: 'number',
                 step: 'any', min: 0, max: 100 })}
-      ${field({ label: 'Power min %', name: 'power_min', value: v.power_min, type: 'number',
+      ${field({ label: 'Min power %', name: 'power_min', value: v.power_min, type: 'number',
                 step: 'any', min: 0, max: 100, hint: 'For ramped / cut-through modes' })}
     </div>
-
     <div class="field-row field-row--3">
+      ${field({ label: 'Speed', name: 'speed', value: v.speed, type: 'number', step: 'any' })}
+      ${selectField({ label: 'Unit', name: 'speed_unit',
+        value: v.speed_unit || machine?.speed_unit || 'mm/s',
+        options: ['mm/s', 'mm/min', 'in/min', '%'], blank: null,
+        hint: machine?.speed_unit ? `${machine.name} reports ${machine.speed_unit}` : null })}
       ${field({ label: 'Passes', name: 'passes', value: v.passes, type: 'number', min: 1 })}
-      ${field({ label: g.galvo ? 'Hatch spacing mm' : 'Interval mm', name: 'line_interval_mm',
-                value: v.line_interval_mm, type: 'number', step: 'any' })}
-      ${g.raster ? field({ label: 'DPI', name: 'dpi', value: v.dpi, type: 'number' }) : ''}
     </div>
+    ${field({ label: 'Focus offset mm', name: 'focus_offset_mm', value: v.focus_offset_mm,
+              type: 'number', step: 'any' })}
 
+    <div class="section-title">Resolution &amp; spacing</div>
     <div class="field-row field-row--3">
-      ${field({ label: 'Focus offset mm', name: 'focus_offset_mm', value: v.focus_offset_mm,
+      ${field({ label: 'Line interval / XY-Z spacing mm', name: 'line_interval_mm',
+                value: v.line_interval_mm, type: 'number', step: 'any' })}
+      ${field({ label: 'DPI', name: 'dpi', value: v.dpi, type: 'number' })}
+      ${field({ label: 'LPI', name: 'lpi', value: v.lpi, type: 'number', step: 'any' })}
+    </div>
+    <div class="field-row">
+      ${field({ label: 'Overscanning %', name: 'overscan_pct', value: v.overscan_pct,
                 type: 'number', step: 'any' })}
-      ${field({ label: 'Z step mm', name: 'z_step_mm', value: v.z_step_mm, type: 'number', step: 'any' })}
-      ${field({ label: 'Pass depth mm', name: 'pass_depth_mm', value: v.pass_depth_mm,
-                type: 'number', step: 'any' })}
+      ${field({ label: 'Dot width correction mm', name: 'dot_width_correction_mm',
+                value: v.dot_width_correction_mm, type: 'number', step: 'any' })}
+    </div>
+    ${selectField({ label: 'Image mode', name: 'image_mode', value: v.image_mode,
+      options: IMAGE_MODES, blank: 'Not set' })}
+    <div class="field-row">
+      ${switchField({ label: 'Negative image', name: 'negative_image', checked: v.negative_image })}
+      ${switchField({ label: 'Pass-through', name: 'pass_through', checked: v.pass_through })}
     </div>
 
-    ${g.pulse ? `
-      <div class="section-title">Pulse</div>
+    ${isFiber ? `
+      <div class="section-title">Fiber-specific</div>
       <div class="field-row field-row--3">
         ${field({ label: 'Frequency kHz', name: 'frequency_khz', value: v.frequency_khz,
                   type: 'number', step: 'any',
@@ -513,115 +599,206 @@ export function openEntryEditor(entry, ctx, onSaved) {
         ${field({ label: 'Pulse width ns', name: 'pulse_width_ns', value: v.pulse_width_ns,
                   type: 'number', step: 'any',
                   hint: machine?.pulse_widths_ns ? `Fitted: ${machine.pulse_widths_ns}` : null })}
-        ${field({ label: 'Kerf mm', name: 'kerf_mm', value: v.kerf_mm, type: 'number', step: 'any' })}
-      </div>` : `
-      <details ${(v.frequency_khz != null || v.pulse_width_ns != null || v.kerf_mm != null) ? 'open' : ''}>
-        <summary class="field__label" style="cursor:pointer;padding:8px 0">
-          Frequency, pulse width &amp; kerf
-        </summary>
-        <div class="field-row field-row--3" style="margin-top:8px">
-          ${field({ label: 'Frequency kHz', name: 'frequency_khz', value: v.frequency_khz,
-                    type: 'number', step: 'any' })}
-          ${field({ label: 'Pulse width ns', name: 'pulse_width_ns', value: v.pulse_width_ns,
-                    type: 'number', step: 'any' })}
-          ${field({ label: 'Kerf mm', name: 'kerf_mm', value: v.kerf_mm, type: 'number', step: 'any' })}
-        </div>
-      </details>`}
-
-    ${g.galvo ? `
-      <div class="section-title">Scan pattern</div>
-      <div class="field-row">
-        ${field({ label: 'Hatch angle °', name: 'hatch_angle_deg', value: v.hatch_angle_deg,
-                  type: 'number', step: 'any', hint: '0, 45 and 90 behave differently on brushed stock' })}
-        ${field({ label: 'Wobble amplitude mm', name: 'wobble_amp_mm', value: v.wobble_amp_mm,
-                  type: 'number', step: 'any' })}
+        ${field({ label: 'Q-Pulse', name: 'q_pulse', value: v.q_pulse, placeholder: 'on / mode / value' })}
       </div>
-      ${switchField({ label: 'Cross-hatch (second pass at 90°)', name: 'hatch_cross',
-        checked: v.hatch_cross })}
-      ${switchField({ label: 'Bidirectional scan', name: 'bidir', checked: v.bidir })}
-      ${switchField({ label: 'Wobble on', name: 'wobble_on', checked: v.wobble_on })}
-      ${v.wobble_on || v.wobble_freq_hz != null ? field({
-        label: 'Wobble frequency Hz', name: 'wobble_freq_hz', value: v.wobble_freq_hz,
-        type: 'number', step: 'any' }) : ''}` : ''}
-
-    ${g.colour ? `
-      <div class="section-title">Colour</div>
       <div class="field-row">
-        ${field({ label: 'Colour it produced', name: 'color_result', value: v.color_result,
-          placeholder: 'Gold, blue, black anneal' })}
-        ${field({ label: 'Swatch', name: 'color_hex', value: v.color_hex || '#c9a227',
-          type: 'color' })}
-      </div>` : ''}
+        ${selectField({ label: 'Lens', name: 'lens_mm', value: v.lens_mm,
+          options: lensList.map((l) => ({ value: l, label: `${l}mm` })), blank: 'Not recorded' })}
+      </div>
+      ${switchField({ label: 'Wobble on', name: 'wobble_on', checked: v.wobble_on })}
+      ${v.wobble_on ? `<div class="field-row">
+        ${field({ label: 'Wobble amplitude mm', name: 'wobble_amp_mm', value: v.wobble_amp_mm,
+          type: 'number', step: 'any' })}
+        ${field({ label: 'Wobble frequency Hz', name: 'wobble_freq_hz', value: v.wobble_freq_hz,
+          type: 'number', step: 'any' })}
+      </div>` : ''}` : ''}
 
-    ${switchField({ label: 'Air assist on', name: 'air_assist', checked: v.air_assist })}
+    <div class="section-title">Air assist</div>
+    ${selectField({ label: 'Air assist', name: 'air_assist_level',
+      value: v.air_assist_level || (v.air_assist ? 'high' : 'off'),
+      options: AIR_ASSIST_LEVELS, blank: null })}
 
-    <div class="section-title">Setup</div>
-    <span class="field__hint" style="margin-top:-6px">
-      A fiber setting is only reproducible with the lens it was made on — spot size
-      and energy density change with focal length. Rotary work doesn't carry to flat.
-    </span>
+    <div class="section-title">Hatch settings</div>
     <div class="field-row">
-      ${selectField({ label: 'Lens', name: 'lens_mm', value: v.lens_mm,
-        options: lensList.map((l) => ({ value: l, label: `${l}mm` })),
-        blank: 'Not recorded' })}
-      ${field({ label: 'Rotary diameter mm', name: 'rotary_diameter_mm',
-        value: v.rotary_diameter_mm, type: 'number', step: 'any',
-        placeholder: 'e.g. 80 for a tumbler' })}
+      ${selectField({ label: 'Hatch type', name: 'hatch_type', value: v.hatch_type,
+        options: HATCH_TYPES, blank: 'Not set' })}
+      ${field({ label: 'Hatch angle °', name: 'hatch_angle_deg', value: v.hatch_angle_deg,
+        type: 'number', step: 'any' })}
     </div>
-    ${switchField({ label: 'Run on the rotary', name: 'rotary', checked: v.rotary })}
+    <div class="field-row">
+      ${field({ label: 'Angle increment °', name: 'hatch_angle_increment_deg',
+        value: v.hatch_angle_increment_deg, type: 'number', step: 'any' })}
+      ${field({ label: 'Kerf offset mm', name: 'kerf_mm', value: v.kerf_mm, type: 'number', step: 'any' })}
+    </div>
+    <div class="field-row">
+      ${field({ label: 'Z step per pass mm', name: 'z_step_mm', value: v.z_step_mm,
+        type: 'number', step: 'any' })}
+      ${field({ label: 'Ramp length mm', name: 'ramp_length_mm', value: v.ramp_length_mm,
+        type: 'number', step: 'any' })}
+    </div>
 
-    <div class="section-title">How it came out</div>
+    <div class="section-title">Cleanup pass settings</div>
+    ${switchField({ label: 'Enable cleanup pass', name: 'cleanup_enabled', checked: v.cleanup_enabled })}
+    ${v.cleanup_enabled ? `
+      <div class="field-row field-row--3">
+        ${field({ label: 'Power %', name: 'cleanup_power', value: v.cleanup_power, type: 'number', step: 'any' })}
+        ${field({ label: 'Speed', name: 'cleanup_speed', value: v.cleanup_speed, type: 'number', step: 'any' })}
+        ${field({ label: 'Passes', name: 'cleanup_passes', value: v.cleanup_passes, type: 'number', min: 1 })}
+      </div>
+      ${field({ label: 'Interval mm', name: 'cleanup_interval_mm', value: v.cleanup_interval_mm,
+        type: 'number', step: 'any' })}` : ''}
+
+    <div class="section-title">Design files</div>
+    <div class="field">
+      <div class="chips" id="dfiles-chips"></div>
+      <div class="searchbar" style="margin-top:8px">
+        ${icons.search}
+        <input type="text" id="dfiles-q" placeholder="Search files by name, path, category…" autocomplete="off">
+      </div>
+      <div id="dfiles-results" class="list"></div>
+      <span class="field__hint">Attach the design file(s) this setting was used on.</span>
+    </div>
+
+    <div id="photos" style="margin-top:8px"></div>
+
+    <div class="section-title">Result</div>
     ${ratingField('rating', v.rating || 0)}
     ${selectField({ label: 'Outcome', name: 'outcome', value: v.outcome,
       options: OUTCOMES, blank: 'Not recorded' })}
-
-    ${g.quality ? `
-      <div class="field-row">
-        ${selectField({ label: 'Edge', name: 'dross', value: v.dross,
-          options: [
-            { value: 'none', label: 'Clean' },
-            { value: 'light', label: 'Light char / dross' },
-            { value: 'heavy', label: 'Heavy char / dross' },
-          ], blank: 'Not recorded' })}
-        ${selectField({ label: 'Edge quality', name: 'edge_quality', value: v.edge_quality,
-          options: [1, 2, 3, 4, 5].map((n) => ({ value: n, label: `${n} / 5` })),
-          blank: 'Not rated' })}
-      </div>
-      ${field({ label: 'Taper / squareness', name: 'taper_note', value: v.taper_note,
-        placeholder: 'Back face 0.3mm narrower — raise focus 1mm' })}` : ''}
-
     ${textareaField({ label: 'Notes', name: 'notes', value: v.notes,
       placeholder: 'Flashback on the underside, needs masking. Cut through at 2 passes.' })}
     ${field({ label: 'Tags', name: '_tags', value: (v.tags || []).join(', '),
       placeholder: 'ply, coasters, production', hint: 'Comma separated' })}
     ${switchField({ label: 'Favourite', name: 'is_favorite', checked: v.is_favorite })}
-    ${!isNew ? '<div id="photos" style="margin-top:8px"></div>' : ''}`;
+
+    <details ${(g.gas || g.pierce || g.quality || v.rotary || v.bidir || v.color_result
+                 || v.dross || v.edge_quality || v.pass_depth_mm != null) ? 'open' : ''}>
+      <summary class="field__label" style="cursor:pointer;padding:8px 0">Advanced</summary>
+      <div class="stack" style="margin-top:8px">
+        ${g.colour ? `
+          <div class="field-row">
+            ${field({ label: 'Colour it produced', name: 'color_result', value: v.color_result,
+              placeholder: 'Gold, blue, black anneal' })}
+            ${field({ label: 'Swatch', name: 'color_hex', value: v.color_hex || '#c9a227', type: 'color' })}
+          </div>` : ''}
+        <div class="field-row">
+          ${field({ label: 'Pass depth mm', name: 'pass_depth_mm', value: v.pass_depth_mm,
+            type: 'number', step: 'any' })}
+          ${field({ label: 'Rotary diameter mm', name: 'rotary_diameter_mm',
+            value: v.rotary_diameter_mm, type: 'number', step: 'any', placeholder: 'e.g. 80 for a tumbler' })}
+        </div>
+        ${switchField({ label: 'Run on the rotary', name: 'rotary', checked: v.rotary })}
+        ${switchField({ label: 'Bidirectional scan', name: 'bidir', checked: v.bidir })}
+        ${g.quality ? `
+          <div class="field-row">
+            ${selectField({ label: 'Edge', name: 'dross', value: v.dross,
+              options: [
+                { value: 'none', label: 'Clean' },
+                { value: 'light', label: 'Light char / dross' },
+                { value: 'heavy', label: 'Heavy char / dross' },
+              ], blank: 'Not recorded' })}
+            ${selectField({ label: 'Edge quality', name: 'edge_quality', value: v.edge_quality,
+              options: [1, 2, 3, 4, 5].map((n) => ({ value: n, label: `${n} / 5` })), blank: 'Not rated' })}
+          </div>
+          ${field({ label: 'Taper / squareness', name: 'taper_note', value: v.taper_note,
+            placeholder: 'Back face 0.3mm narrower — raise focus 1mm' })}` : ''}
+        ${g.gas ? `
+          <div class="field-row field-row--3">
+            ${selectField({ label: 'Assist gas', name: 'assist_gas', value: v.assist_gas,
+              options: ASSIST_GASES, blank: null })}
+            ${field({ label: 'Gas pressure bar', name: 'gas_pressure_bar', value: v.gas_pressure_bar,
+              type: 'number', step: 'any' })}
+            ${field({ label: 'Nozzle mm', name: 'nozzle_mm', value: v.nozzle_mm, type: 'number', step: 'any' })}
+          </div>` : ''}
+        ${g.pierce ? `
+          <div class="field-row field-row--3">
+            ${field({ label: 'Pierce time ms', name: 'pierce_time_ms', value: v.pierce_time_ms,
+              type: 'number', step: 'any' })}
+            ${field({ label: 'Pierce power %', name: 'pierce_power', value: v.pierce_power,
+              type: 'number', step: 'any' })}
+            ${field({ label: 'Standoff mm', name: 'standoff_mm', value: v.standoff_mm,
+              type: 'number', step: 'any' })}
+          </div>` : ''}
+      </div>
+    </details>`;
 
     bindRating(body);
 
-    // Warn the moment a flagged material is picked, not after the job has run.
-    const matSel = $('[name=material_id]', body);
-    const showHazard = () => {
-      const mat = materials.find((x) => x.id === matSel.value);
-      $('#mat-hazard', body).innerHTML = mat ? hazardBanner(mat) : '';
+    // Design-files picker. Kept out of the redraw-triggering fields below so
+    // that adding one doesn't re-render (and lose focus on) the rest of the
+    // form — it mutates v._files in place instead.
+    const chipsHost = $('#dfiles-chips', body);
+    const paintChips = () => {
+      chipsHost.innerHTML = (v._files || []).length
+        ? v._files.map((f) => `
+            <button type="button" class="chip is-on" data-dfile="${esc(f.id)}">
+              ${esc(f.name)} ${icons.close}
+            </button>`).join('')
+        : '<span class="small muted">No files attached yet</span>';
     };
-    matSel.addEventListener('change', showHazard);
-    showHazard();
+    paintChips();
+    chipsHost.addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-dfile]');
+      if (!b) return;
+      v._files = (v._files || []).filter((f) => f.id !== b.dataset.dfile);
+      paintChips();
+    });
+
+    const qInput = $('#dfiles-q', body);
+    const resultsHost = $('#dfiles-results', body);
+    let lastResults = [];
+    let searchTimer;
+    qInput.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      const term = qInput.value.trim();
+      if (!term) { resultsHost.innerHTML = ''; return; }
+      searchTimer = setTimeout(async () => {
+        let res;
+        try { res = await api.get('/api/files?q=' + encodeURIComponent(term) + '&limit=8'); }
+        catch { return; }
+        const already = new Set((v._files || []).map((f) => f.id));
+        lastResults = res.files.filter((f) => !already.has(f.id));
+        resultsHost.innerHTML = lastResults.length
+          ? lastResults.map((f) => `
+              <div class="listitem" data-pick="${esc(f.id)}" style="cursor:pointer">
+                <div class="listitem__main">
+                  <div class="listitem__title">${esc(f.name)}</div>
+                  <div class="listitem__sub">${esc(f.category || f.folder || '')}</div>
+                </div>
+              </div>`).join('')
+          : '<div class="small muted" style="padding:6px 0">No matches</div>';
+      }, 220);
+    });
+    resultsHost.addEventListener('click', (ev) => {
+      const item = ev.target.closest('[data-pick]');
+      if (!item) return;
+      const f = lastResults.find((x) => x.id === item.dataset.pick);
+      if (!f) return;
+      v._files = [...(v._files || []), { id: f.id, name: f.name, category: f.category }];
+      qInput.value = '';
+      resultsHost.innerHTML = '';
+      paintChips();
+    });
 
     // Anything that changes which fields belong on the form redraws it,
     // carrying whatever has been typed so far.
-    for (const name of ['machine_id', 'wobble_on']) {
+    for (const name of ['machine_id', 'material_id', 'wobble_on', 'cleanup_enabled']) {
       const ctrl = $(`[name=${name}]`, body);
       if (ctrl) ctrl.addEventListener('change', () => {
         const cur = readForm(body);
         cur.tags = String(cur._tags || '').split(',').map((s) => s.trim()).filter(Boolean);
         delete cur._tags;
-        draw({ ...v, ...cur });
+        draw({ ...v, ...cur, _files: v._files });
       });
     }
   };
 
-  draw({ ...e });
+  const initialFiles = isNew && presetFiles.length
+    ? presetFiles.map((f) => ({ id: f.id, name: f.name, category: f.category }))
+    : (e.files || []);
+  const initialMachineId = e.machine_id || (isNew && presetFiles[0]?.machine_id) || null;
+
+  draw({ ...e, machine_id: initialMachineId, _files: initialFiles });
 
   if (!isNew) photoStrip($('#photos', body), 'entry', e.id, e.photos || []);
 
@@ -645,6 +822,7 @@ export function openEntryEditor(entry, ctx, onSaved) {
           delete data._tags;
           if (e.id) data.id = e.id;
           data.tags = tags;
+          data.file_ids = ($$('#dfiles-chips [data-dfile]', body) || []).map((b) => b.dataset.dfile);
           if (!data.title && !data.material_id) {
             toast('Give it a title or pick a material', 'bad');
             return true;

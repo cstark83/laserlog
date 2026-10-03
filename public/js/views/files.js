@@ -9,8 +9,9 @@ import * as api from '../api.js';
 import {
   $, $$, el, esc, num, bytes, icons, relTime, openSheet, closeSheet, confirmSheet,
   toast, readForm, field, selectField, textareaField, switchField, empty, thickness,
-  FILE_KINDS, opLabel,
+  FILE_KINDS, opLabel, stars, outcomeBadge,
 } from '../ui.js';
+import { openEntryDetail, openEntryEditor } from './entries.js';
 
 const PAGE = 200;
 
@@ -195,6 +196,7 @@ function fileCard(f) {
         <div class="filecard__sub">
           ${f.category ? `<span class="badge">${esc(f.category)}</span>` : '<span class="muted">—</span>'}
           <span class="muted">${bytes(f.size)}</span>
+          ${f.entry_count ? `<span class="badge">${icons.library} ${f.entry_count}</span>` : ''}
         </div>
       </div>
       ${f.is_favorite ? `<span class="filecard__fav">${icons.star}</span>` : ''}
@@ -346,6 +348,10 @@ export function openFileDetail(file, ctx, onChanged) {
       <div class="field__label" style="margin-bottom:6px">Notes inside the file</div>
       <div style="white-space:pre-wrap">${esc(file.meta.notes)}</div></div>` : ''}
 
+    <div class="section-title">Settings library entries</div>
+    <div id="linked-entries" class="stack"></div>
+    <button class="btn btn--sm" id="log-settings">${icons.plus}<span>Log settings for this file</span></button>
+
     ${cuts.length ? `
       <div class="section-title">Settings found in this file</div>
       <div class="card stack">
@@ -400,6 +406,54 @@ export function openFileDetail(file, ctx, onChanged) {
     </div>`;
 
   const form = $('#fileform', body);
+
+  const loadLinkedEntries = async () => {
+    const host = $('#linked-entries', body);
+    let rows = [];
+    try { rows = await api.get(`/api/files/${file.id}/entries`); } catch { /* offline */ }
+    if (!rows.length) {
+      host.innerHTML = `<div class="small muted">No settings logged for this file yet.</div>`;
+      return;
+    }
+    host.innerHTML = rows.map((r) => `
+      <div class="listitem" data-entry="${esc(r.id)}" style="cursor:pointer">
+        <div class="listitem__main">
+          <div class="listitem__title">${esc(r.title || r.material_name || 'Untitled setting')}
+            ${r.operation ? `<span class="badge badge--op" style="margin-left:6px">${esc(opLabel(r.operation))}</span>` : ''}
+          </div>
+          <div class="listitem__sub">
+            ${[r.machine_name, r.material_name,
+               r.speed != null ? `${num(r.speed, 0)} ${r.speed_unit || 'mm/min'}` : null,
+               r.power_max != null ? `${num(r.power_max)}%` : null]
+              .filter(Boolean).map(esc).join(' · ')}
+          </div>
+          <div class="row" style="gap:8px;margin-top:2px">
+            ${r.rating ? stars(r.rating) : ''}
+            ${outcomeBadge(r.outcome)}
+          </div>
+        </div>
+        <span class="listitem__chev">${icons.chevron}</span>
+      </div>`).join('');
+    host.onclick = async (e2) => {
+      const item = e2.target.closest('[data-entry]');
+      if (!item) return;
+      try {
+        const full = await api.get(`/api/entries/${item.dataset.entry}`);
+        openEntryDetail(full, ctx, () => { loadLinkedEntries(); onChanged?.(); });
+      } catch { toast('Could not open that setting', 'bad'); }
+    };
+  };
+  loadLinkedEntries();
+
+  $('#log-settings', body).addEventListener('click', () => {
+    closeSheet();
+    openEntryEditor(
+      { machine_id: file.machine_id || null, material_id: file.material_id || null },
+      ctx,
+      onChanged,
+      [file]
+    );
+  });
 
   $('#import-settings', body)?.addEventListener('click', async (e) => {
     const btn = e.currentTarget;
